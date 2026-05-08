@@ -31,7 +31,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            -e GITHUB_TOKEN="${{ secrets.MY_GITHUB_TOKEN }}" \
             -e BOBSHELL_API_KEY="${{ secrets.BOBSHELL_API_KEY }}" \
             -e FIXIUM_AUTHORIZED_USERS="${{ secrets.FIXIUM_AUTHORIZED_USERS }}" \
             -e GITHUB_REPOSITORY="${{ github.repository }}" \

@@ -18,10 +18,11 @@ Configure these secrets in your repository settings (`Settings > Secrets and var
 
 | Secret Name | Description | How to Get |
 |-------------|-------------|------------|
+| `MY_GITHUB_TOKEN` | GitHub Personal Access Token with repo permissions | Create at [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens) |
 | `BOBSHELL_API_KEY` | IBM Bob AI API key | Get from [Bob Dashboard](https://bob.ibm.com) |
 | `FIXIUM_AUTHORIZED_USERS` | Comma-separated list of GitHub usernames allowed to trigger reviews | Example: `user1,user2,user3` |
 
-**Note**: `GITHUB_TOKEN` is automatically provided by GitHub Actions.
+**Note**: `MY_GITHUB_TOKEN` requires `repo` scope for reading PR files and posting comments.
 
 ### Docker Image
 
@@ -155,9 +156,10 @@ ghcr.io/your-org/fixium:latest
 ### Authentication Errors
 
 **Check:**
-1. `BOBSHELL_API_KEY` is set correctly
-2. API key is valid and not expired
-3. API key has sufficient credits
+1. `MY_GITHUB_TOKEN` is set correctly with `repo` scope
+2. `BOBSHELL_API_KEY` is set correctly
+3. API keys are valid and not expired
+4. Bob API key has sufficient credits
 
 ### Docker Image Not Found
 
@@ -170,8 +172,9 @@ ghcr.io/your-org/fixium:latest
 
 **Check:**
 1. Review completed successfully (check Actions logs)
-2. `GITHUB_TOKEN` has write permissions
+2. `MY_GITHUB_TOKEN` has `repo` scope with write permissions
 3. Review found issues (check artifacts for JSON output)
+4. Token has access to the repository
 
 ## Cost Management
 
