@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Modal, Input, Button } from '../common';
 import { getUserByCredentials, registerUser, isErrorResponse } from '../../services/api';
 import { useUser } from '../../hooks/useUser';
@@ -12,12 +12,15 @@ interface UserIdentificationProps {
 
 export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentificationProps) => {
   const { setUser } = useUser();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  
+  // Refs for uncontrolled inputs
+  const nameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  // UI state that requires re-renders
   const [isLoading, setIsLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
   
-  //validate email addresses
   const validateEmail = (email: string): boolean => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
@@ -26,12 +29,16 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim() || !email.trim()) {
+    // Accessing values directly from refs
+    const nameValue = nameRef.current?.value || '';
+    const emailValue = emailRef.current?.value || '';
+
+    if (!nameValue.trim() || !emailValue.trim()) {
       toast.error('Please fill in all fields');
       return;
     }
 
-    if (!validateEmail(email.trim())) {
+    if (!validateEmail(emailValue.trim())) {
       toast.error('Please enter a valid email address');
       return;
     }
@@ -39,9 +46,11 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
     setIsLoading(true);
 
     try {
+      const trimmedName = nameValue.trim();
+      const trimmedEmail = emailValue.trim();
+
       if (isNewUser) {
-        // Register new user
-        const result = await registerUser({ name: name.trim(), email: email.trim() });
+        const result = await registerUser({ name: trimmedName, email: trimmedEmail });
         
         if (isErrorResponse(result)) {
           toast.error(result.details || result.error);
@@ -53,11 +62,9 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
         onSuccess();
         onClose();
       } else {
-        // Try to find existing user
-        const result = await getUserByCredentials(name.trim(), email.trim());
+        const result = await getUserByCredentials(trimmedName, trimmedEmail);
         
         if (isErrorResponse(result)) {
-          // User not found, suggest registration
           toast.error('User not found. Please register or check your credentials.');
           setIsNewUser(true);
           return;
@@ -76,8 +83,10 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
   };
 
   const handleClose = () => {
-    setName('');
-    setEmail('');
+    // Manually clearing refs if needed, though closing the modal 
+    // usually unmounts/resets them anyway
+    if (nameRef.current) nameRef.current.value = '';
+    if (emailRef.current) emailRef.current.value = '';
     setIsNewUser(false);
     onClose();
   };
@@ -96,12 +105,15 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
             : 'Enter your name and email to continue'}
         </p>
 
+        {/* 
+          Note: Ensure your 'Input' component forwards the ref 
+          using React.forwardRef or accepts a 'ref' prop.
+        */}
         <Input
           label="Name"
           type="text"
           placeholder="John Doe"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          ref={nameRef}
           required
         />
 
@@ -109,8 +121,7 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
           label="Email"
           type="email"
           placeholder="john@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          ref={emailRef}
           required
         />
 
@@ -133,5 +144,3 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
     </Modal>
   );
 };
-
-// Made with Bob
