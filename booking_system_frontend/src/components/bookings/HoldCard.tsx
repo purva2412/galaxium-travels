@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Flight, StoredHold } from '../../types';
 import { Card, Button } from '../common';
 import { Zap, Plane, Crown, Rocket, Timer, CheckCircle, XCircle } from 'lucide-react';
@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 interface HoldCardProps {
   storedHold: StoredHold;
   flight?: Flight;
-  onAction: () => void; // called after confirm or release to refresh parent
+  onAction: () => void;
 }
 
 export const HoldCard = ({ storedHold, flight, onAction }: HoldCardProps) => {
@@ -20,49 +20,54 @@ export const HoldCard = ({ storedHold, flight, onAction }: HoldCardProps) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
+  
+  // 1. Store the interval ID in a ref to ensure clean management
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const update = () => {
       const remaining = new Date(storedHold.reservedUntil).getTime() - Date.now();
-      setTimeLeft(isNaN(remaining) ? 0 : Math.max(0, remaining));
+      const calculatedTime = isNaN(remaining) ? 0 : Math.max(0, remaining);
+      
+      setTimeLeft(calculatedTime);
+
+      // 2. Clear interval automatically when it hits zero
+      if (calculatedTime === 0 && timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     };
 
     update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
+    timerRef.current = setInterval(update, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [storedHold.reservedUntil]);
 
-  const minutes = Math.floor(timeLeft / 60000);
-  const seconds = Math.floor((timeLeft % 60000) / 1000);
-  const timerDisplay = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  // Derived values
   const isExpired = timeLeft === 0;
-
   const isLoading = isConfirming || isReleasing;
 
-  const getSeatIcon = () => {
-    switch (storedHold.seatClass) {
-      case 'business':
-        return <Crown size={16} className="text-purple-400" />;
-      case 'galaxium':
-        return <Rocket size={16} className="text-alien-green" />;
-      default:
-        return <Plane size={16} className="text-blue-400" />;
-    }
-  };
+  const timerDisplay = useMemo(() => {
+    const minutes = Math.floor(timeLeft / 60000);
+    const seconds = Math.floor((timeLeft % 60000) / 1000);
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }, [timeLeft]);
 
-  const getSeatClassName = () => {
+  const seatConfig = useMemo(() => {
     switch (storedHold.seatClass) {
       case 'business':
-        return 'Business';
+        return { icon: <Crown size={16} className="text-purple-400" />, label: 'Business' };
       case 'galaxium':
-        return 'Galaxium Class';
+        return { icon: <Rocket size={16} className="text-alien-green" />, label: 'Galaxium Class' };
       default:
-        return 'Economy';
+        return { icon: <Plane size={16} className="text-blue-400" />, label: 'Economy' };
     }
-  };
+  }, [storedHold.seatClass]);
 
   const handleConfirm = async () => {
-    if (!user) return;
+    if (!user || isLoading) return;
     setIsConfirming(true);
     try {
       const confirmed = await confirmHold(storedHold.holdId);
@@ -77,7 +82,7 @@ export const HoldCard = ({ storedHold, flight, onAction }: HoldCardProps) => {
   };
 
   const handleRelease = async () => {
-    if (!user) return;
+    if (!user || isLoading) return;
     setIsReleasing(true);
     try {
       await releaseHold(storedHold.holdId);
@@ -99,18 +104,10 @@ export const HoldCard = ({ storedHold, flight, onAction }: HoldCardProps) => {
       transition={{ duration: 0.2 }}
     >
       <Card className={`border ${isExpired ? 'border-red-500/30' : 'border-solar-orange/30'}`}>
-        {/* Header */}
         <div className="flex items-start justify-between mb-4 pb-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div
-              className={`p-2 rounded-lg ${
-                isExpired ? 'bg-red-500/20' : 'bg-solar-orange/20'
-              }`}
-            >
-              <Zap
-                className={isExpired ? 'text-red-400' : 'text-solar-orange'}
-                size={20}
-              />
+            <div className={`p-2 rounded-lg ${isExpired ? 'bg-red-500/20' : 'bg-solar-orange/20'}`}>
+              <Zap className={isExpired ? 'text-red-400' : 'text-solar-orange'} size={20} />
             </div>
             <div>
               <p className="text-xs text-star-white/60 font-mono">{storedHold.holdId}</p>
@@ -133,7 +130,6 @@ export const HoldCard = ({ storedHold, flight, onAction }: HoldCardProps) => {
           </div>
         </div>
 
-        {/* Flight details */}
         <div className="space-y-3 mb-4">
           {flight ? (
             <div>
@@ -148,8 +144,8 @@ export const HoldCard = ({ storedHold, flight, onAction }: HoldCardProps) => {
 
           <div className="flex items-center justify-between pt-2 border-t border-white/10">
             <div className="flex items-center gap-2">
-              {getSeatIcon()}
-              <span className="text-sm text-star-white/70">{getSeatClassName()}</span>
+              {seatConfig.icon}
+              <span className="text-sm text-star-white/70">{seatConfig.label}</span>
             </div>
             <span className="text-lg font-bold text-star-white">
               {storedHold.totalPrice != null && !isNaN(storedHold.totalPrice)
@@ -159,47 +155,44 @@ export const HoldCard = ({ storedHold, flight, onAction }: HoldCardProps) => {
           </div>
         </div>
 
-        {/* Actions */}
-        {!isExpired && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {!isExpired ? (
+            <>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleRelease}
+                isLoading={isReleasing}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                Release
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirm}
+                isLoading={isConfirming}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                <CheckCircle size={14} /> Confirm
+              </Button>
+            </>
+          ) : (
             <Button
-              variant="danger"
+              variant="secondary"
               size="sm"
-              onClick={handleRelease}
-              isLoading={isReleasing}
-              disabled={isLoading}
-              className="flex-1"
+              onClick={() => {
+                if (user) removeHold(user.user_id, storedHold.holdId);
+                onAction();
+              }}
+              className="w-full"
             >
-              Release
+              Dismiss
             </Button>
-            <Button
-              size="sm"
-              onClick={handleConfirm}
-              isLoading={isConfirming}
-              disabled={isLoading}
-              className="flex-1"
-            >
-              <CheckCircle size={14} /> Confirm
-            </Button>
-          </div>
-        )}
-
-        {isExpired && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              if (user) removeHold(user.user_id, storedHold.holdId);
-              onAction();
-            }}
-            className="w-full"
-          >
-            Dismiss
-          </Button>
-        )}
+          )}
+        </div>
       </Card>
     </motion.div>
   );
 };
-
-// Made with Bob
