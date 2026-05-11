@@ -100,10 +100,9 @@ export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModa
   ];
 
   const selectedClassData = seatClasses.find((sc) => sc.class === selectedClass);
-
-  const minutes = Math.floor(timeLeft / 60000);
-  const seconds = Math.floor((timeLeft % 60000) / 1000);
-  const timerDisplay = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const minutes = Math.floor(timeLeft / 60000).toString().padStart(2, '0');
+  const seconds = Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, '0');
+  const timerDisplay = `${minutes}:${seconds}`;
   const isExpired = hold !== null && timeLeft === 0;
 
   const flightSummary = (
